@@ -130,7 +130,7 @@ String testGeoJson = '''
       },
       "properties": {
         "gid": 14,
-        "obmocje": "Test polygon"
+        "type": "Test polygon"
       }
     },
     {
@@ -156,6 +156,20 @@ String testGeoJson = '''
       },
       "properties": {
         "section": "Point M-4"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": 
+              [  14.475314661954956,
+                45.99528512959203]
+      },
+      "properties": {
+        "section": "Multipoint M-10",
+        "subType": "circle",
+        "radius": 400
       }
     },
     {
@@ -232,7 +246,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> processData() async {
     // parse a small test geoJson
     // normally one would use http to access geojson on web and this is
-    // the reason why this funcyion is async.
+    // the reason why this function is async.
     geoJsonParser.parseGeoJsonAsString(testGeoJson);
   }
 
@@ -275,12 +289,9 @@ class _MyHomePageState extends State<MyHomePage> {
                     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
                 subdomains: const ['a', 'b', 'c']),
             //userAgentPackageName: 'dev.fleaflet.flutter_map.example',
-            loadingData
-                ? const Center(child: CircularProgressIndicator())
-                : PolygonLayer(
-                    polygons: geoJsonParser.polygons,
-                  ),
-            if (!loadingData) PolylineLayer(polylines: geoJsonParser.polylines),
+            if (loadingData) const Center(child: CircularProgressIndicator()),
+            if (!loadingData) PolygonLayer( polygons: geoJsonParser.polygons),
+            if (!loadingData) PolylineLayer(polylines: geoJsonParser.polyLines),
             if (!loadingData) MarkerLayer(markers: geoJsonParser.markers),
             if (!loadingData) CircleLayer(circles: geoJsonParser.circles),
           ],

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+/// Method Pointers
 typedef MarkerCreationCallback = Marker Function(
     LatLng point, Map<String, dynamic> properties);
 typedef CircleMarkerCreationCallback = CircleMarker Function(
@@ -13,6 +14,11 @@ typedef PolylineCreationCallback = Polyline Function(
 typedef PolygonCreationCallback = Polygon Function(List<LatLng> points,
     List<List<LatLng>>? holePointsList, Map<String, dynamic> properties);
 typedef FilterFunction = bool Function(Map<String, dynamic> properties);
+
+/// Enumerations
+enum FeatureTypes {
+  point,circle,multiPoint,lineString,multiLineString,polygon,multiPolygon
+}
 
 /// GeoJsonParser parses the GeoJson and fills three lists of parsed objects
 /// which are defined in flutter_map package
@@ -37,7 +43,7 @@ class GeoJsonParser {
   final List<Marker> markers = [];
 
   /// list of [Polyline] objects created as result of parsing
-  final List<Polyline> polylines = [];
+  final List<Polyline> polyLines = [];
 
   /// list of [Polygon] objects created as result of parsing
   final List<Polygon> polygons = [];
@@ -122,8 +128,8 @@ class GeoJsonParser {
   });
 
   /// parse GeJson in [String] format
-  void parseGeoJsonAsString(String g) {
-    return parseGeoJson(jsonDecode(g) as Map<String, dynamic>);
+  void parseGeoJsonAsString(String geoJsonString) {
+    return parseGeoJson(jsonDecode(geoJsonString) as Map<String, dynamic>);
   }
 
   /// set default [Marker] color
@@ -132,8 +138,8 @@ class GeoJsonParser {
   }
 
   /// set default [Marker] icon
-  set setDefaultMarkerIcon(IconData ic) {
-    defaultMarkerIcon = ic;
+  set setDefaultMarkerIcon(IconData iconData) {
+    defaultMarkerIcon = iconData;
   }
 
   /// set default [Marker] tap callback function
@@ -184,7 +190,7 @@ class GeoJsonParser {
   }
 
   /// main GeoJson parsing function
-  void parseGeoJson(Map<String, dynamic> g) {
+  void parseGeoJson(Map<String, dynamic> geoJson) {
     // set default values if they are not specified by constructor
     markerCreationCallback ??= createDefaultMarker;
     circleMarkerCreationCallback ??= createDefaultCircleMarker;
@@ -204,126 +210,149 @@ class GeoJsonParser {
     defaultCircleMarkerIsFilled ??= true;
 
     // loop through the GeoJson Map and parse it
-    for (Map f in g['features'] as List) {
-      String geometryType = f['geometry']['type'].toString();
-      // check if this spatial object passes the filter function
-      if (!filterFunction!(f['properties'] as Map<String, dynamic>)) {
+    for (Map feature in geoJson['features'] as List) {
+      if (!filterFunction!(feature['properties'] as Map<String, dynamic>)) {
         continue;
       }
+      String geometryString = feature['geometry']['type'].toString();
+      FeatureTypes geometryType = FeatureTypes.values.byName(geometryString.replaceRange(0, 1, geometryString[0].toLowerCase()));
       switch (geometryType) {
-        case 'Point':
-          {
-            markers.add(
-              markerCreationCallback!(
-                  LatLng(f['geometry']['coordinates'][1] as double,
-                      f['geometry']['coordinates'][0] as double),
-                  f['properties'] as Map<String, dynamic>),
-            );
-          }
+        case FeatureTypes.point:
+          makePoint(feature);
           break;
-        case 'Circle':
-          {
-            circles.add(
-              circleMarkerCreationCallback!(
-                  LatLng(f['geometry']['coordinates'][1] as double,
-                      f['geometry']['coordinates'][0] as double),
-                  f['properties'] as Map<String, dynamic>),
-            );
-          }
+        case FeatureTypes.circle:
+          makeCircle(feature);
           break;
-        case 'MultiPoint':
-          {
-            for (final point in f['geometry']['coordinates'] as List) {
-              markers.add(
-                markerCreationCallback!(
-                    LatLng(point[1] as double, point[0] as double),
-                    f['properties'] as Map<String, dynamic>),
-              );
-            }
-          }
+        case FeatureTypes.multiPoint:
+          makeMultiPoint(feature);
           break;
-        case 'LineString':
-          {
-            final List<LatLng> lineString = [];
-            for (final coords in f['geometry']['coordinates'] as List) {
-              lineString.add(LatLng(coords[1] as double, coords[0] as double));
-            }
-            polylines.add(polyLineCreationCallback!(
-                lineString, f['properties'] as Map<String, dynamic>));
-          }
+        case FeatureTypes.lineString:
+          makeLineString(feature);
           break;
-        case 'MultiLineString':
-          {
-            for (final line in f['geometry']['coordinates'] as List) {
-              final List<LatLng> lineString = [];
-              for (final coords in line as List) {
-                lineString
-                    .add(LatLng(coords[1] as double, coords[0] as double));
-              }
-              polylines.add(polyLineCreationCallback!(
-                  lineString, f['properties'] as Map<String, dynamic>));
-            }
-          }
+        case FeatureTypes.multiLineString:
+          makeMultiLineString(feature);
           break;
-        case 'Polygon':
-          {
-            final List<LatLng> outerRing = [];
-            final List<List<LatLng>> holesList = [];
-            int pathIndex = 0;
-            for (final path in f['geometry']['coordinates'] as List) {
-              final List<LatLng> hole = [];
-              for (final coords in path as List<dynamic>) {
-                if (pathIndex == 0) {
-                  // add to polygon's outer ring
-                  outerRing
-                      .add(LatLng(coords[1] as double, coords[0] as double));
-                } else {
-                  // add it to current hole
-                  hole.add(LatLng(coords[1] as double, coords[0] as double));
-                }
-              }
-              if (pathIndex > 0) {
-                // add hole to the polygon's list of holes
-                holesList.add(hole);
-              }
-              pathIndex++;
-            }
-            polygons.add(polygonCreationCallback!(
-                outerRing, holesList, f['properties'] as Map<String, dynamic>));
-          }
+        case FeatureTypes.polygon:
+          makePolygon(feature);
           break;
-        case 'MultiPolygon':
-          {
-            for (final polygon in f['geometry']['coordinates'] as List) {
-              final List<LatLng> outerRing = [];
-              final List<List<LatLng>> holesList = [];
-              int pathIndex = 0;
-              for (final path in polygon as List) {
-                List<LatLng> hole = [];
-                for (final coords in path as List<dynamic>) {
-                  if (pathIndex == 0) {
-                    // add to polygon's outer ring
-                    outerRing
-                        .add(LatLng(coords[1] as double, coords[0] as double));
-                  } else {
-                    // add it to a hole
-                    hole.add(LatLng(coords[1] as double, coords[0] as double));
-                  }
-                }
-                if (pathIndex > 0) {
-                  // add to polygon's list of holes
-                  holesList.add(hole);
-                }
-                pathIndex++;
-              }
-              polygons.add(polygonCreationCallback!(outerRing, holesList,
-                  f['properties'] as Map<String, dynamic>));
-            }
-          }
+        case FeatureTypes.multiPolygon:
+          makeMultiPolygon(feature);
           break;
       }
     }
-    return;
+  }
+
+  void makePoint(Map<dynamic, dynamic> feature) {
+    if ((feature['properties'] as Map).containsKey('subType') &&
+        (feature['properties']['subType'] == 'circle')) {
+        makeCircle(feature);
+    } else {
+      markers.add(
+        markerCreationCallback!(
+            LatLng(feature['geometry']['coordinates'][1] as double,
+                feature['geometry']['coordinates'][0] as double),
+            feature['properties'] as Map<String, dynamic>),
+      );
+    }
+  }
+
+  void makeCircle(Map<dynamic, dynamic> feature) {
+    circles.add(
+      circleMarkerCreationCallback!(
+          LatLng(feature['geometry']['coordinates'][1] as double,
+              feature['geometry']['coordinates'][0] as double),
+          feature['properties'] as Map<String, dynamic>),
+    );
+  }
+
+  /// takes a feature and makes multiple [Marker]s from it and adds it to the [markers] list
+  void makeMultiPoint(Map<dynamic, dynamic> feature) {
+    for (final point in feature['geometry']['coordinates'] as List) {
+      markers.add(
+        markerCreationCallback!(
+            LatLng(point[1] as double, point[0] as double),
+            feature['properties'] as Map<String, dynamic>),
+      );
+    }
+  }
+
+  /// takes a feature and makes a [Polyline] from it and adds it to the [polyLines] list
+  void makeLineString(Map<dynamic, dynamic> feature) {
+    final List<LatLng> lineString = [];
+    for (final coords in feature['geometry']['coordinates'] as List) {
+      lineString.add(LatLng(coords[1] as double, coords[0] as double));
+    }
+    polyLines.add(polyLineCreationCallback!(
+        lineString, feature['properties'] as Map<String, dynamic>));
+  }
+
+  // takes a feature and makes multiple [Polyline]s from it and adds it to the [polyLines] list
+  void makeMultiLineString(Map<dynamic, dynamic> feature) {
+    for (final line in feature['geometry']['coordinates'] as List) {
+      final List<LatLng> lineString = [];
+      for (final coords in line as List) {
+        lineString
+            .add(LatLng(coords[1] as double, coords[0] as double));
+      }
+      polyLines.add(polyLineCreationCallback!(
+          lineString, feature['properties'] as Map<String, dynamic>));
+    }
+  }
+
+  // takes a feature and makes a [Polygon] from it and adds it to the [polygons] list
+  void makePolygon(Map<dynamic, dynamic> feature) {
+    final List<LatLng> outerRing = [];
+    final List<List<LatLng>> holesList = [];
+    int pathIndex = 0;
+    for (final path in feature['geometry']['coordinates'] as List) {
+      final List<LatLng> hole = [];
+      for (final coords in path as List<dynamic>) {
+        if (pathIndex == 0) {
+          // add to polygon's outer ring
+          outerRing
+              .add(LatLng(coords[1] as double, coords[0] as double));
+        } else {
+          // add it to current hole
+          hole.add(LatLng(coords[1] as double, coords[0] as double));
+        }
+      }
+      if (pathIndex > 0) {
+        // add hole to the polygon's list of holes
+        holesList.add(hole);
+      }
+      pathIndex++;
+    }
+    polygons.add(polygonCreationCallback!(
+        outerRing, holesList, feature['properties'] as Map<String, dynamic>));
+  }
+
+  // Takes a feature amd make a [MultiPolygon] from it and adds it to the [polygons] list
+  void makeMultiPolygon(Map<dynamic, dynamic> feature) {
+    for (final polygon in feature['geometry']['coordinates'] as List) {
+      final List<LatLng> outerRing = [];
+      final List<List<LatLng>> holesList = [];
+      int pathIndex = 0;
+      for (final path in polygon as List) {
+        List<LatLng> hole = [];
+        for (final coords in path as List<dynamic>) {
+          if (pathIndex == 0) {
+            // add to polygon's outer ring
+            outerRing
+                .add(LatLng(coords[1] as double, coords[0] as double));
+          } else {
+            // add it to a hole
+            hole.add(LatLng(coords[1] as double, coords[0] as double));
+          }
+        }
+        if (pathIndex > 0) {
+          // add to polygon's list of holes
+          holesList.add(hole);
+        }
+        pathIndex++;
+      }
+      polygons.add(polygonCreationCallback!(outerRing, holesList,
+          feature['properties'] as Map<String, dynamic>));
+    }
   }
 
   /// default function for creating tappable [Marker]
@@ -347,24 +376,6 @@ class GeoJsonParser {
       child: defaultTappableMarker(properties, markerTapped),
     );
   }
-
-  // /// default callback function for creating [Marker]
-  // Marker createDefaultMarker(LatLng point, Map<String, dynamic> properties) {
-  //   return Marker(
-  //     point: point,
-  //     child: MouseRegion(
-  //       cursor: SystemMouseCursors.click,
-  //       child: GestureDetector(
-  //         onTap: () {
-  //           markerTapped(properties);
-  //         },
-  //         child: Icon(defaultMarkerIcon, color: defaultMarkerColor),
-  //       ),
-  //     ),
-  //     width: 60,
-  //     height: 60,
-  //   );
-  // }
 
   /// default callback function for creating [Polygon]
   CircleMarker createDefaultCircleMarker(
