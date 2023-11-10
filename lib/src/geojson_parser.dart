@@ -244,7 +244,7 @@ class GeoJsonParser {
 
   void makePoint(Map<dynamic, dynamic> feature) {
     if ((feature['properties'] as Map).containsKey('subType') &&
-        (feature['properties']['subType'] == 'circle')) {
+        (feature['properties']['subType'] == 'Circle')) {
         makeCircle(feature);
     } else {
       markers.add(
@@ -358,13 +358,14 @@ class GeoJsonParser {
   /// default function for creating tappable [Marker]
   Widget defaultTappableMarker(Map<String, dynamic> properties,
       void Function(Map<String, dynamic>) onMarkerTap) {
-    return MouseRegion(
+      var color = (properties.containsKey("type") && properties["type"] == "asset") ? Colors.orange : defaultMarkerColor;
+      return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: () {
           onMarkerTap(properties);
         },
-        child: Icon(defaultMarkerIcon, color: defaultMarkerColor),
+        child: Icon(defaultMarkerIcon, color: color),
       ),
     );
   }
@@ -380,13 +381,24 @@ class GeoJsonParser {
   /// default callback function for creating [Polygon]
   CircleMarker createDefaultCircleMarker(
       LatLng point, Map<String, dynamic> properties) {
-    return CircleMarker(
-      point: point,
-      radius: properties["radius"].toDouble(),
-      useRadiusInMeter: true,
-      color: defaultCircleMarkerColor!,
-      borderColor: defaultCircleMarkerBorderColor!,
-    );
+    if (properties.containsKey("type") && properties["type"] == "stationKeeping"){
+        return CircleMarker(
+          point: point,
+          radius: properties["radius"].toDouble(),
+          useRadiusInMeter: true,
+          color: Colors.yellow.withOpacity(0.0),
+          borderColor: Colors.yellow,
+          borderStrokeWidth: 4,
+        );
+    } else {
+      return CircleMarker(
+        point: point,
+        radius: properties["radius"].toDouble(),
+        useRadiusInMeter: true,
+        color: defaultCircleMarkerColor!,
+        borderColor: defaultCircleMarkerBorderColor!,
+      );
+    }
   }
 
   /// default callback function for creating [Polyline]
