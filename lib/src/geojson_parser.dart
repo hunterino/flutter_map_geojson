@@ -5,19 +5,16 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 /// Method Pointers
-typedef MarkerCreationCallback = Marker Function(
-    LatLng point, Map<String, dynamic> properties);
-typedef CircleMarkerCreationCallback = CircleMarker Function(
-    LatLng point, Map<String, dynamic> properties);
-typedef PolylineCreationCallback = Polyline Function(
-    List<LatLng> points, Map<String, dynamic> properties);
-typedef PolygonCreationCallback = Polygon Function(List<LatLng> points,
-    List<List<LatLng>>? holePointsList, Map<String, dynamic> properties);
-typedef FilterFunction = bool Function(Map<String, dynamic> properties);
+typedef MarkerCreationCallback =        Marker       Function({required LatLng point, required Map<String, dynamic> properties});
+typedef CircleMarkerCreationCallback =  CircleMarker Function({required LatLng point, required Map<String, dynamic> properties});
+typedef PolylineCreationCallback =      Polyline     Function({required List<LatLng> points, required Map<String, dynamic> properties});
+typedef PolygonCreationCallback =       Polygon      Function({required List<LatLng> points, required List<List<LatLng>>? holePointsList, required Map<String, dynamic> properties});
+typedef FilterFunction =                bool         Function({required Map<String, dynamic> properties});
 
 /// Enumerations
 enum FeatureTypes {
-  point,circle,multiPoint,lineString,multiLineString,polygon,multiPolygon
+  point, circle, lineString, polygon, // single
+  multiPoint, multiLineString, multiPolygon // multiple
 }
 
 /// GeoJsonParser parses the GeoJson and fills three lists of parsed objects
@@ -107,29 +104,37 @@ class GeoJsonParser {
 
   /// default constructor - all parameters are optional and can be set later with setters
   GeoJsonParser({
+    // callbacks
     this.markerCreationCallback,
     this.polyLineCreationCallback,
     this.polygonCreationCallback,
     this.circleMarkerCreationCallback,
+    // filters
     this.filterFunction,
+    //// styling
+    // Marker
     this.defaultMarkerColor,
     this.defaultMarkerIcon,
-    this.onMarkerTapCallback,
+    // Polyline
     this.defaultPolylineColor,
     this.defaultPolylineStroke,
+    // Polygon
     this.defaultPolygonBorderColor,
     this.defaultPolygonFillColor,
     this.defaultPolygonBorderStroke,
     this.defaultPolygonIsFilled,
+    // Circle
     this.defaultCircleMarkerColor,
     this.defaultCircleMarkerBorderColor,
     this.defaultCircleMarkerIsFilled,
+    // handlers
+    this.onMarkerTapCallback,
     this.onCircleMarkerTapCallback,
   });
 
   /// parse GeJson in [String] format
   void parseGeoJsonAsString(String geoJsonString) {
-    return parseGeoJson(jsonDecode(geoJsonString) as Map<String, dynamic>);
+    return parseGeoJson(jsonDecode(geoJsonString));
   }
 
   /// set default [Marker] color
@@ -192,11 +197,14 @@ class GeoJsonParser {
   /// main GeoJson parsing function
   void parseGeoJson(Map<String, dynamic> geoJson) {
     // set default values if they are not specified by constructor
+    // creation callbacks
     markerCreationCallback ??= createDefaultMarker;
     circleMarkerCreationCallback ??= createDefaultCircleMarker;
     polyLineCreationCallback ??= createDefaultPolyline;
     polygonCreationCallback ??= createDefaultPolygon;
+    // filter function
     filterFunction ??= defaultFilterFunction;
+    // style
     defaultMarkerColor ??= Colors.red.withOpacity(0.8);
     defaultMarkerIcon ??= Icons.location_pin;
     defaultPolylineColor ??= Colors.blue.withOpacity(0.8);
@@ -210,8 +218,8 @@ class GeoJsonParser {
     defaultCircleMarkerIsFilled ??= true;
 
     // loop through the GeoJson Map and parse it
-    for (Map feature in geoJson['features'] as List) {
-      if (!filterFunction!(feature['properties'] as Map<String, dynamic>)) {
+    for (Map<String, dynamic> feature in geoJson['features'] as List) {
+      if (!filterFunction!(properties: feature['properties'])) {
         continue;
       }
       String geometryString = feature['geometry']['type'].toString();
@@ -242,52 +250,51 @@ class GeoJsonParser {
     }
   }
 
-  void makePoint(Map<dynamic, dynamic> feature) {
+  void makePoint(Map<String, dynamic> feature) {
     if ((feature['properties'] as Map).containsKey('subType') &&
         (feature['properties']['subType'] == 'Circle')) {
         makeCircle(feature);
     } else {
       markers.add(
-        markerCreationCallback!(
+        markerCreationCallback!(point:
             LatLng(feature['geometry']['coordinates'][1] as double,
                 feature['geometry']['coordinates'][0] as double),
-            feature['properties'] as Map<String, dynamic>),
+            properties: feature['properties'] ),
       );
     }
   }
 
-  void makeCircle(Map<dynamic, dynamic> feature) {
-    circles.add(
-      circleMarkerCreationCallback!(
-          LatLng(feature['geometry']['coordinates'][1] as double,
-              feature['geometry']['coordinates'][0] as double),
-          feature['properties'] as Map<String, dynamic>),
-    );
-  }
-
-  /// takes a feature and makes multiple [Marker]s from it and adds it to the [markers] list
   void makeMultiPoint(Map<dynamic, dynamic> feature) {
     for (final point in feature['geometry']['coordinates'] as List) {
       markers.add(
         markerCreationCallback!(
-            LatLng(point[1] as double, point[0] as double),
-            feature['properties'] as Map<String, dynamic>),
+            point: LatLng(point[1] as double, point[0] as double),
+            properties: feature['properties'] as Map<String, dynamic>),
       );
     }
   }
 
+  void makeCircle(Map<String, dynamic> feature) {
+    circles.add(
+      circleMarkerCreationCallback!(
+          point: LatLng(feature['geometry']['coordinates'][1] as double,
+              feature['geometry']['coordinates'][0] as double),
+          properties: feature['properties'] ),
+    );
+  }
+
   /// takes a feature and makes a [Polyline] from it and adds it to the [polyLines] list
-  void makeLineString(Map<dynamic, dynamic> feature) {
+  void makeLineString(Map<String, dynamic> feature) {
     final List<LatLng> lineString = [];
     for (final coords in feature['geometry']['coordinates'] as List) {
       lineString.add(LatLng(coords[1] as double, coords[0] as double));
     }
     polyLines.add(polyLineCreationCallback!(
-        lineString, feature['properties'] as Map<String, dynamic>));
+        points:lineString, properties: feature['properties']));
   }
 
   // takes a feature and makes multiple [Polyline]s from it and adds it to the [polyLines] list
-  void makeMultiLineString(Map<dynamic, dynamic> feature) {
+  void makeMultiLineString(Map<String, dynamic> feature) {
     for (final line in feature['geometry']['coordinates'] as List) {
       final List<LatLng> lineString = [];
       for (final coords in line as List) {
@@ -295,12 +302,12 @@ class GeoJsonParser {
             .add(LatLng(coords[1] as double, coords[0] as double));
       }
       polyLines.add(polyLineCreationCallback!(
-          lineString, feature['properties'] as Map<String, dynamic>));
+          points: lineString, properties: feature['properties']));
     }
   }
 
   // takes a feature and makes a [Polygon] from it and adds it to the [polygons] list
-  void makePolygon(Map<dynamic, dynamic> feature) {
+  void makePolygon(Map<String, dynamic> feature) {
     final List<LatLng> outerRing = [];
     final List<List<LatLng>> holesList = [];
     int pathIndex = 0;
@@ -322,12 +329,17 @@ class GeoJsonParser {
       }
       pathIndex++;
     }
-    polygons.add(polygonCreationCallback!(
-        outerRing, holesList, feature['properties'] as Map<String, dynamic>));
+    polygons.add(
+      polygonCreationCallback!(
+        points: outerRing,
+        holePointsList: holesList,
+        properties: feature['properties'],
+      )
+    );
   }
 
   // Takes a feature amd make a [MultiPolygon] from it and adds it to the [polygons] list
-  void makeMultiPolygon(Map<dynamic, dynamic> feature) {
+  void makeMultiPolygon(Map<String, dynamic> feature) {
     for (final polygon in feature['geometry']['coordinates'] as List) {
       final List<LatLng> outerRing = [];
       final List<List<LatLng>> holesList = [];
@@ -350,8 +362,13 @@ class GeoJsonParser {
         }
         pathIndex++;
       }
-      polygons.add(polygonCreationCallback!(outerRing, holesList,
-          feature['properties'] as Map<String, dynamic>));
+      polygons.add(
+          polygonCreationCallback!(
+              points: outerRing,
+              holePointsList: holesList,
+              properties: feature['properties'],
+          )
+      );
     }
   }
 
@@ -371,7 +388,7 @@ class GeoJsonParser {
   }
 
   /// default callback function for creating [Marker]
-  Marker createDefaultMarker(LatLng point, Map<String, dynamic> properties) {
+  Marker createDefaultMarker({required LatLng point, required Map<String, dynamic> properties}) {
     return Marker(
       point: point,
       child: defaultTappableMarker(properties, markerTapped),
@@ -379,8 +396,7 @@ class GeoJsonParser {
   }
 
   /// default callback function for creating [Polygon]
-  CircleMarker createDefaultCircleMarker(
-      LatLng point, Map<String, dynamic> properties) {
+  CircleMarker createDefaultCircleMarker({required LatLng point, required Map<String, dynamic> properties}) {
     if (properties.containsKey("type") && properties["type"] == "stationKeeping"){
         return CircleMarker(
           point: point,
@@ -402,8 +418,8 @@ class GeoJsonParser {
   }
 
   /// default callback function for creating [Polyline]
-  Polyline createDefaultPolyline(
-      List<LatLng> points, Map<String, dynamic> properties) {
+  Polyline createDefaultPolyline({
+      required List<LatLng> points, required Map<String, dynamic> properties}) {
     return Polyline(
         points: points,
         color: defaultPolylineColor!,
@@ -411,11 +427,11 @@ class GeoJsonParser {
   }
 
   /// default callback function for creating [Polygon]
-  Polygon createDefaultPolygon(List<LatLng> outerRing,
-      List<List<LatLng>>? holesList, Map<String, dynamic> properties) {
+  Polygon createDefaultPolygon({required List<LatLng> points,
+      required List<List<LatLng>>? holePointsList, required Map<String, dynamic> properties}) {
     return Polygon(
-      points: outerRing,
-      holePointsList: holesList,
+      points: points,
+      holePointsList: holePointsList,
       borderColor: defaultPolygonBorderColor!,
       color: defaultPolygonFillColor!,
       isFilled: defaultPolygonIsFilled!,
@@ -424,7 +440,7 @@ class GeoJsonParser {
   }
 
   /// the default filter function returns always true - therefore no filtering
-  bool defaultFilterFunction(Map<String, dynamic> properties) {
+  bool defaultFilterFunction({required Map<String, dynamic> properties}) {
     return true;
   }
 

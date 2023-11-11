@@ -229,7 +229,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   bool loadingData = false;
 
-  bool myFilterFunction(Map<String, dynamic> properties) {
+  bool myFilterFunction({required Map<String, dynamic> properties}) {
     if (properties['section'].toString().contains('Point M-4')) {
       return false;
     } else {
