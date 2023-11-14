@@ -290,10 +290,10 @@ class _MyHomePageState extends State<MyHomePage> {
                 subdomains: const ['a', 'b', 'c']),
             //userAgentPackageName: 'dev.fleaflet.flutter_map.example',
             if (loadingData) const Center(child: CircularProgressIndicator()),
+            if (!loadingData) CircleLayer(circles: geoJsonParser.circles),
             if (!loadingData) PolygonLayer( polygons: geoJsonParser.polygons),
             if (!loadingData) PolylineLayer(polylines: geoJsonParser.polyLines),
             if (!loadingData) MarkerLayer(markers: geoJsonParser.markers),
-            if (!loadingData) CircleLayer(circles: geoJsonParser.circles),
           ],
         ));
   }
