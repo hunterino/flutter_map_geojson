@@ -285,12 +285,14 @@ class GeoJsonParser {
 
   /// takes a feature and makes a [Polyline] from it and adds it to the [polyLines] list
   void makeLineString(Map<String, dynamic> feature) {
-    final List<LatLng> lineString = [];
+    final List<LatLng> linePoints = [];
     for (final coords in feature['geometry']['coordinates'] as List) {
-      lineString.add(LatLng(coords[1] as double, coords[0] as double));
+      linePoints.add(LatLng(coords[1] as double, coords[0] as double));
     }
+    var props = feature['properties'];
+    props['points'] = linePoints;
     polyLines.add(polyLineCreationCallback!(
-        points:lineString, properties: feature['properties']));
+        points:linePoints, properties: props));
   }
 
   // takes a feature and makes multiple [Polyline]s from it and adds it to the [polyLines] list
