@@ -213,8 +213,8 @@ class GeoJsonParser {
     defaultPolygonFillColor ??= Colors.black.withOpacity(0.1);
     defaultPolygonIsFilled ??= true;
     defaultPolygonBorderStroke ??= 1.0;
-    defaultCircleMarkerColor ??= Colors.blue.withOpacity(0.25);
-    defaultCircleMarkerBorderColor ??= Colors.black.withOpacity(0.8);
+    defaultCircleMarkerColor ??= Colors.blue.withOpacity(0.15);
+    defaultCircleMarkerBorderColor ??= Colors.black.withOpacity(0.5);
     defaultCircleMarkerIsFilled ??= true;
 
     // loop through the GeoJson Map and parse it
@@ -404,7 +404,7 @@ class GeoJsonParser {
           point: point,
           radius: properties["radius"].toDouble(),
           useRadiusInMeter: true,
-          color: Colors.yellow.withOpacity(0.0),
+          color: Colors.yellow.withOpacity(0.5),
           borderColor: Colors.yellow,
           borderStrokeWidth: 4,
         );
