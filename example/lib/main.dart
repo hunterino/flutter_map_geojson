@@ -155,7 +155,44 @@ String testGeoJson = '''
         [14.481, 45.982]
       },
       "properties": {
-        "section": "Point M-4"
+        "section": "Point M-4",
+        "metadata": [
+          {
+            "type": "stationKeeping",
+            "subType": "Circle",
+            "radius": 500
+          },
+          {
+            "type": "sensorRange",
+            "subType": "Circle",
+            "radius": 1000
+          }
+        ]
+
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": 
+        [14.481, 45.982]
+      },
+      "properties": {
+        "section": "Multipoint M-10",
+        "metadata": [
+          {
+            "type": "stationKeeping",
+            "subType": "Circle",
+            "radius": 500
+          },
+          {
+            "type": "sensorRange",
+            "subType": "Circle",
+            "radius": 1000
+          }
+        ]
+
       }
     },
     {
@@ -168,7 +205,7 @@ String testGeoJson = '''
       },
       "properties": {
         "section": "Multipoint M-10",
-        "subType": "circle",
+        "subType": "Circle",
         "radius": 400
       }
     },
@@ -227,9 +264,11 @@ class _MyHomePageState extends State<MyHomePage> {
       defaultCircleMarkerColor: Colors.red.withOpacity(0.25),
   );
 
+
   bool loadingData = false;
 
-  bool myFilterFunction({required Map<String, dynamic> properties}) {
+  bool myFilterFunction({required Map<String, dynamic> feature}) {
+    Map<String, dynamic> properties = feature['properties'];
     if (properties['section'].toString().contains('Point M-4')) {
       return false;
     } else {
@@ -247,7 +286,47 @@ class _MyHomePageState extends State<MyHomePage> {
     // parse a small test geoJson
     // normally one would use http to access geojson on web and this is
     // the reason why this function is async.
+    geoJsonParser.markerCreationCallback = createCustomMarker;
+    geoJsonParser.circleMarkerCreationCallback = createCustomCircleMarker;
     geoJsonParser.parseGeoJsonAsString(testGeoJson);
+  }
+
+  /// default callback function for creating [Polygon]
+  CircleMarker createCustomCircleMarker({required Map<String, dynamic> feature, required LatLng point}) {
+    Map<String, dynamic> properties = feature['properties'];
+    if (properties.containsKey("type") &&
+        properties["type"] == "stationKeeping") {
+      return CircleMarker(
+        point: point,
+        radius: properties["radius"].toDouble(),
+        useRadiusInMeter: true,
+        color: Colors.yellow.withOpacity(0.5),
+        borderColor: Colors.yellow,
+        borderStrokeWidth: 4,
+      );
+    } else {
+      return CircleMarker(
+        point: point,
+        radius: properties["radius"].toDouble(),
+        useRadiusInMeter: true,
+        color: geoJsonParser.defaultCircleMarkerColor!,
+        borderColor: geoJsonParser.defaultCircleMarkerBorderColor!,
+      );
+    }
+  }
+
+  Marker createCustomMarker({required Map<String, dynamic> feature, required LatLng point}) {
+    Map<String, dynamic> properties = feature['properties'];
+    if (properties.containsKey('metadata')) {
+      for (final metadata in properties['metadata'] as List) {
+        properties['subType'] = metadata['subType'];
+        properties['radius'] = metadata['radius'];
+        geoJsonParser.circles.add(geoJsonParser.circleMarkerCreationCallback!(point: point, feature: feature));
+      }
+    } else if (properties.containsKey('subType') && (properties['subType'] == 'Circle')) {
+      geoJsonParser.circles.add( geoJsonParser.circleMarkerCreationCallback!(point: point, feature: feature));
+    }
+    return geoJsonParser.createDefaultMarker(point: point, feature: feature);
   }
 
   @override
