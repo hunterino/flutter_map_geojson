@@ -3,6 +3,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_geojson/flutter_map_geojson.dart';
 // ignore: depend_on_referenced_packages
 import 'package:latlong2/latlong.dart';
+import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
+
 
 String testGeoJson = '''
 {
@@ -130,7 +132,7 @@ String testGeoJson = '''
       },
       "properties": {
         "gid": 14,
-        "obmocje": "Test polygon"
+        "type": "Test polygon"
       }
     },
     {
@@ -155,7 +157,58 @@ String testGeoJson = '''
         [14.481, 45.982]
       },
       "properties": {
-        "section": "Point M-4"
+        "section": "Point M-4",
+        "metadata": [
+          {
+            "type": "stationKeeping",
+            "subType": "Circle",
+            "radius": 500
+          },
+          {
+            "type": "sensorRange",
+            "subType": "Circle",
+            "radius": 1000
+          }
+        ]
+
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": 
+        [14.481, 45.982]
+      },
+      "properties": {
+        "section": "Multipoint M-10",
+        "metadata": [
+          {
+            "type": "stationKeeping",
+            "subType": "Circle",
+            "radius": 500
+          },
+          {
+            "type": "sensorRange",
+            "subType": "Circle",
+            "radius": 1000
+          }
+        ]
+
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": 
+              [  14.475314661954956,
+                45.99528512959203]
+      },
+      "properties": {
+        "section": "Multipoint M-10",
+        "subType": "Circle",
+        "radius": 400
       }
     },
     {
@@ -213,9 +266,11 @@ class _MyHomePageState extends State<MyHomePage> {
     defaultCircleMarkerColor: Colors.red.withOpacity(0.25),
   );
 
+
   bool loadingData = false;
 
-  bool myFilterFunction(Map<String, dynamic> properties) {
+  bool myFilterFunction({required Map<String, dynamic> feature}) {
+    Map<String, dynamic> properties = feature['properties'];
     if (properties['section'].toString().contains('Point M-4')) {
       return false;
     } else {
@@ -232,8 +287,49 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> processData() async {
     // parse a small test geoJson
     // normally one would use http to access geojson on web and this is
-    // the reason why this funcyion is async.
+    // the reason why this function is async.
+    geoJsonParser.markerCreationCallback = createCustomMarker;
+    geoJsonParser.circleMarkerCreationCallback = createCustomCircleMarker;
     geoJsonParser.parseGeoJsonAsString(testGeoJson);
+    geoJsonParser.parseGeoJsonAsString(geoJsonString);
+  }
+
+  /// default callback function for creating [Polygon]
+  CircleMarker createCustomCircleMarker({required Map<String, dynamic> feature, required LatLng point}) {
+    Map<String, dynamic> properties = feature['properties'];
+    if (properties.containsKey("type") &&
+        properties["type"] == "stationKeeping") {
+      return CircleMarker(
+        point: point,
+        radius: properties["radius"].toDouble(),
+        useRadiusInMeter: true,
+        color: Colors.yellow.withOpacity(0.5),
+        borderColor: Colors.yellow,
+        borderStrokeWidth: 4,
+      );
+    } else {
+      return CircleMarker(
+        point: point,
+        radius: properties["radius"].toDouble(),
+        useRadiusInMeter: true,
+        color: geoJsonParser.defaultCircleMarkerColor!,
+        borderColor: geoJsonParser.defaultCircleMarkerBorderColor!,
+      );
+    }
+  }
+
+  Marker createCustomMarker({required Map<String, dynamic> feature, required LatLng point}) {
+    Map<String, dynamic> properties = feature['properties'];
+    if (properties.containsKey('metadata')) {
+      for (final metadata in properties['metadata'] as List) {
+        properties['subType'] = metadata['subType'];
+        properties['radius'] = metadata['radius'];
+        geoJsonParser.circles.add(geoJsonParser.circleMarkerCreationCallback!(point: point, feature: feature));
+      }
+    } else if (properties.containsKey('subType') && (properties['subType'] == 'Circle')) {
+      geoJsonParser.circles.add( geoJsonParser.circleMarkerCreationCallback!(point: point, feature: feature));
+    }
+    return geoJsonParser.createDefaultMarker(point: point, feature: feature);
   }
 
   @override
@@ -275,14 +371,11 @@ class _MyHomePageState extends State<MyHomePage> {
                     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
                 subdomains: const ['a', 'b', 'c']),
             //userAgentPackageName: 'dev.fleaflet.flutter_map.example',
-            loadingData
-                ? const Center(child: CircularProgressIndicator())
-                : PolygonLayer(
-                    polygons: geoJsonParser.polygons,
-                  ),
-            if (!loadingData) PolylineLayer(polylines: geoJsonParser.polylines),
-            if (!loadingData) MarkerLayer(markers: geoJsonParser.markers),
+            if (loadingData) const Center(child: CircularProgressIndicator()),
             if (!loadingData) CircleLayer(circles: geoJsonParser.circles),
+            if (!loadingData) PolygonLayer( polygons: geoJsonParser.polygons),
+            if (!loadingData) PolylineLayer(polylines: geoJsonParser.polyLines),
+            if (!loadingData) MarkerLayer(markers: geoJsonParser.markers),
           ],
         ));
   }
